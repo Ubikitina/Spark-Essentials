@@ -19,7 +19,7 @@
     - [Example: Join and Cogroup](#example-join-and-cogroup)
   - [Executing Spark](#executing-spark)
 
-
+---
 
 ## RDD Definition and Characteristics
 
