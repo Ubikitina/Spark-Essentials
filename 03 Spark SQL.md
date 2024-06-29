@@ -917,6 +917,7 @@ In Spark SQL, joins are fundamental operations for combining data from multiple 
 ![](./img/03_30.png)
 
 **Broadcast Hash Join**
+
 The Broadcast Hash Join in Spark SQL is used when joining a large or medium-sized table (the build table) with a small table (the probe table). The small table is typically small enough to be efficiently replicated across all Spark executors. This approach avoids the need for data shuffling, which can significantly improve performance in certain scenarios.
 
 To use a Broadcast Hash Join effectively, Spark determines whether the small table should be broadcasted based on its size, which must be less than `spark.sql.autoBroadcastJoinThreshold` (default is 30MB) unless explicitly hinted otherwise in the query. 
@@ -924,7 +925,8 @@ To use a Broadcast Hash Join effectively, Spark determines whether the small tab
 ![](./img/03_31.png)
 
 **Shuffle Hash Join**
-It is the default implementation of a join in Spark. This join involves partitioning both datasets and performing an exchange of data (shuffle) to ensure that matching keys end up on the same partition. 
+
+It is the default implementation of a join in Spark. This join involves partitioning both datasets and performing an exchange of data (shuffle) to ensure that matching keys end up on the same partition.  Within each node (partition) the data is not sorted, because this is not a sort join.
 
 This approach leverages hashing to distribute and join data across partitions, optimizing the process by ensuring that key-value pairs are correctly matched without the need for data replication across nodes.
 
@@ -933,6 +935,7 @@ The primary requirement for a Shuffle Hash Join is that the smaller dataset must
 ![](./img/03_32.png)
 
 **Sort Merge Join**
+
 It is utilized when joining two large datasets. Unlike other join methods, it involves sorting both datasets before performing the join operation. This sorting ensures that matching keys from both datasets are aligned in each partition, facilitating efficient join operations. 
 
 However, a key distinction from Shuffle Hash Join is that Sort Merge Join may resort to disk storage if the sorted data exceeds memory capacity, potentially affecting performance. By default, Spark prefers Sort Merge Join when possible, as indicated by the `spark.sql.join.preferSortMergeJoin` property being set to true. This method ensures that data alignment and comparison are optimized, maintaining efficient join operations even for large datasets.
