@@ -1,5 +1,5 @@
 # Spark Essentials
-This repository contains a guide to Apache Kafka, covering various topics from fundamentals to advanced concepts.
+This repository contains a guide to Apache Spark, covering various topics from fundamentals to advanced concepts.
 
 ## Overview
 *This repository is currently under construction, so this section will be updated shortly. In the meantime, you can browse the markdown files in the repository to find the content.* 
