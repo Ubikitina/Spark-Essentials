@@ -34,6 +34,10 @@
     - [Triggers](#triggers)
       - [Trigger types](#trigger-types)
       - [Available Now Trigger](#available-now-trigger)
+    - [Continuous Stream Processing (Experimental)](#continuous-stream-processing-experimental)
+    - [Incremental Execution](#incremental-execution)
+    - [Stream - Stream Joins](#stream---stream-joins)
+      - [Stream-Stream Joins using Structured Streaming](#stream-stream-joins-using-structured-streaming)
 
 
 ---
@@ -607,4 +611,103 @@ The choice of trigger depends on the below characteristics:
      - **Available Now**: Processes all available data at the moment of the query execution in multiple batches, dividing the workload to enhance scalability.
 
 By breaking down the data processing into smaller batches, the "Available Now" trigger improves scalability. It allows Spark to handle large volumes of data more efficiently by spreading the workload across batches.
+
+
+
+### Continuous Stream Processing (Experimental)
+
+Continuous Stream Processing, introduced in version 2.3, enables processing records in milliseconds, significantly faster than the seconds typically required by micro-batch processing.
+
+In **Continuous Processing**, multiple long-running tasks are launched to read data from sources. To ensure optimal performance, it is crucial to have enough cores in the cluster to handle all tasks in parallel (example of a task: when consuming data from Kafka partitions). Note that there are no automatic retries for failed tasks in this mode.
+
+
+![](./img/04_17.png)
+
+
+**Supported Queries**
+- Operations: `select`, `map`, `flatMap`, `where`, `filter`, etc.
+- Aggregations are not supported.
+
+**Supported Sources**
+- Kafka Source
+- Rate Source
+
+**Supported Sinks**
+- Kafka Sink
+- Memory Sink
+- Console Sink
+
+**Example:**
+
+This code sets up a continuous streaming job in Apache Spark that reads data from a Kafka topic, processes the data (by casting the key and value to strings), and writes the processed data back to the same Kafka topic. The continuous processing feature is enabled (see `trigger`), allowing the job to process records with minimal latency.
+
+```python
+spark \ # Spark session
+  .readStream \ # Begin reading a stream of data
+  .format("kafka") \ # Set the format of the input data to Kafka
+  .option("kafka.bootstrap.servers", "host1:port1,host2:port2") \ # Specify the Kafka bootstrap servers
+  .option("subscribe", "topic1") \  # Subscribe to the Kafka topic "topic1"
+  .load() \ # Load the data from the specified Kafka topic
+  .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") \ # Select and cast the key and value fields as strings
+  .writeStream \ # Begin writing the stream of data
+  .format("kafka") \ # Set the format of the output data to Kafka
+  .option("kafka.bootstrap.servers", "host1:port1,host2:port2") \ # Specify the Kafka bootstrap servers for the output
+  .option("topic", "topic1") \ # Specify the Kafka topic "topic1" for the output
+  .trigger(continuous="1 second") \  # Set the trigger for continuous processing with a 1-second interval (only change in query)
+  .start() # Start the streaming query
+```
+
+
+### Incremental Execution
+
+Structured Streaming is the stream processing engine built on Apache Spark. Incremental Execution is a key concept in Apache Spark's Structured Streaming, designed to efficiently process streaming data by only computing changes since the last trigger. This approach reduces computational overhead and latency, making real-time data processing more efficient.
+
+**Structured Streaming** will check whether the operations of a streaming query could be executed in incremental mode or not.
+
+![](./img/04_18.png)
+
+
+
+### Stream - Stream Joins
+
+Another stateful operation supported by Spark Structured Streaming is Stream-Stream Join. See more information [here](https://dataninjago.com/2022/07/21/spark-structured-streaming-deep-dive-7-stream-stream-join/).
+
+
+- **Stateful buffering** is required for Stream-Stream Joins due to the asynchronous arrival of matching rows in streaming data.
+- **Symmetric Hash Join** algorithm treats both join sides equally, unlike traditional hash joins.
+- **OneSideHashJoiner** and **SymmetricHashJoinStateManager** manage the state and execution of stream joins.
+- **Watermarks and pre-join filters** are crucial for managing late data and optimizing join processing.
+- **Support for multiple join types**, with specific handling for Outer Joins and Left Semi Joins to manage unmatched rows and efficient joining.
+
+![](./img/04_19.png)
+
+#### Stream-Stream Joins using Structured Streaming
+
+See [The Case for Stream-Stream Joins: Ad Monetization](https://www.databricks.com/blog/2018/03/13/introducing-stream-stream-joins-in-apache-spark-2-3.html)
+
+```python
+impressions = ( # schema - adId: String, impressionTime: Timestamp, ...
+  spark
+    .readStream
+    .format("kafka")
+    .option("subscribe", "impressions")
+    ...
+    .load()
+)
+
+clicks = ( # schema - adId: String, clickTime: Timestamp, ...
+  spark
+    .readStream
+    .format("kafka")
+    .option("subscribe", "clicks")
+    ...
+    .load()
+)
+
+impressions.join(clicks, "adId") # adId is common in both DataFrames
+```
+
+![](./img/04_20.png)
+
+![](./img/04_21.png)
 
