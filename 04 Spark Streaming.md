@@ -38,6 +38,18 @@
     - [Incremental Execution](#incremental-execution)
     - [Stream - Stream Joins](#stream---stream-joins)
       - [Stream-Stream Joins using Structured Streaming](#stream-stream-joins-using-structured-streaming)
+  - [Sink](#sink)
+    - [Structured Streaming Sinks](#structured-streaming-sinks)
+  - [Kafka Connectors](#kafka-connectors)
+    - [Apache Kafka Architecture](#apache-kafka-architecture)
+    - [How to Read Data from Kafka](#how-to-read-data-from-kafka)
+    - [How to Write Data to Kafka](#how-to-write-data-to-kafka)
+  - [Fault Tolerance \& Reliability](#fault-tolerance--reliability)
+    - [Dealing with Failures](#dealing-with-failures)
+    - [Checkpointing](#checkpointing)
+    - [Asynchronous Progress Tracking](#asynchronous-progress-tracking)
+    - [Checkpointing in Databricks](#checkpointing-in-databricks)
+    - [Synchronous vs Asynchronous Checkpointing](#synchronous-vs-asynchronous-checkpointing)
 
 
 ---
@@ -711,3 +723,257 @@ impressions.join(clicks, "adId") # adId is common in both DataFrames
 
 ![](./img/04_21.png)
 
+
+## Sink
+A **sink** refers to the destination where the processed data is written or stored. In streaming data pipelines, data flows from a source, is processed through a series of transformations, and finally is written to a **sink**.
+
+![](./img/04_22.png)
+
+### Structured Streaming Sinks
+
+**Types of Sinks**: Spark supports various types of sinks, including but not limited to:
+- **File Sink**: Writes the output to a directory in the filesystem.
+- **Kafka Sink**: Sends the output to a Kafka topic.
+- **Console Sink**: Prints the output to the console (mainly for debugging purposes).
+- **Memory Sink**: Stores the output in-memory for debugging and testing.
+- **JDBC Sink**: Writes the output to a relational database using JDBC.
+- **ForeachBatchSink**: allows to apply custom logic on each micro-batch of the streaming data
+- **DeltaSink**: sink of the delta data source for streaming queries.
+- **Custom Sinks**: Developers can create custom sinks to write data to other systems.
+
+![](./img/04_23.png)
+
+## Kafka Connectors
+### Apache Kafka Architecture
+**Apache Kafka** is a distributed streaming platform with three key capabilities:
+- **Publish and subscribe** to streams of records.
+- **Store** streams of records in a fault-tolerant, durable way.
+- **Process** streams of records as they occur.
+
+![](./img/04_24.png)
+
+
+### How to Read Data from Kafka
+
+**Structured Streaming integration for Kafka 0.10** allows Apache Spark to read data from Kafka topics and write data to Kafka topics. 
+
+1. Create a Spark DataFrame for Streaming: 
+   - Use `spark.readStream` to indicate that you are reading data in a streaming manner.
+   - Specify the `format` as `"kafka"`, which tells Spark to use the Kafka source.
+
+2. Kafka Configuration Options:
+   - `kafka.bootstrap.servers`: This option specifies the Kafka brokers to connect to. You need to provide a comma-separated list of broker addresses (e.g., `"host1:port1,host2:port2"`).
+   - `subscribe`: This option indicates the Kafka topic you want to subscribe to. In this case, `"topic1"`.
+
+3. Load the Data:
+   - The `load()` method starts the process of reading data from the specified Kafka topic.
+
+4. Data Processing:
+   - The data read from Kafka is in binary format, so it needs to be cast to the appropriate data types. 
+   - The `selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")` line casts the Kafka key and value to strings.
+   - The `.as[(String, String)]` line converts the DataFrame to a Dataset of key-value pairs (tuples of Strings).
+
+
+
+Example: 
+
+```scala
+// Subscribe to 1 topic
+val df = spark
+  .readStream                // read for batch queries
+  .format("kafka")
+  .option("kafka.bootstrap.servers", "host1:port1,host2:port2")
+  .option("subscribe", "topic1")
+  .load()
+
+df.selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)")
+  .as[(String, String)]
+```
+
+### How to Write Data to Kafka
+```scala
+// Write key-value data from a DataFrame to a specific Kafka topic specified in an option
+val ds = df
+  .selectExpr("CAST(key AS STRING)", "CAST(value AS STRING)") / Cast the 'key' and 'value' columns from binary to String
+  .writeStream // Specify that we are writing the stream
+  .format("kafka") // Set the output format to Kafka
+  .option("kafka.bootstrap.servers", "host1:port1,host2:port2")
+  .option("topic", "topic1")
+  .start() // Start the streaming query
+
+// Write key-value data from a DataFrame to Kafka using a topic specified in the data
+val ds = df
+  .selectExpr("topic", "CAST(key AS STRING)", "CAST(value AS STRING)")
+  .writeStream
+  .format("kafka")
+  .option("kafka.bootstrap.servers", "host1:port1,host2:port2")
+  .start()
+```
+
+
+
+## Fault Tolerance & Reliability
+
+Fault tolerance and reliability are critical aspects of streaming applications, which must operate continuously (24x7) and handle various types of failures without data loss or downtime.
+
+A **disaster recovery** (DR) strategy is essential for ensuring that a streaming application can recover from catastrophic events, such as hardware failures, network outages, or data corruption, without losing data or experiencing significant downtime.
+
+### Dealing with Failures
+Mechanisms and strategies for dealing with failures:
+
+1. **Zero Data Loss Guarantees**: This means that every record must be processed without omission. Use Cases: financial transactions or real-time monitoring systems.
+
+2. **Processing Guarantees**:
+   - **At Least Once Guarantee**: Ensures that every record is processed at least once, but duplicates may occur. This is suitable for scenarios where occasional duplicates are acceptable and can be handled downstream.
+   - **Exactly Once Guarantee**: Ensures that every record is processed exactly once, eliminating duplicates. This is crucial for applications where duplicate processing can lead to inconsistencies or errors, such as in financial transactions.
+
+3. **Types of Failures**:
+   - **Executor Failures**: Executors are the worker nodes that process the data. An executor failure means losing one of these workers. Spark can recover by re-assigning tasks to other executors.
+   - **Driver Failures**: The driver node coordinates the entire application. A driver failure is more severe as it can bring down the entire application. Spark provides mechanisms like checkpointing and write-ahead logs to recover from driver failures.
+
+4. **Additional Configurations and Setups**: To achieve higher levels of fault tolerance and the required processing guarantees, additional configurations and setups are necessary. Examples:
+  - **Checkpointing**: Periodically save the state of the streaming application to a reliable storage. This helps in recovering the application state after a failure.
+  - **Write-Ahead Logs (WAL)**: Log every incoming record to a durable storage before processing it. This ensures that no data is lost even if the application crashes.
+  - **High Availability (HA) Setup**: Deploy multiple instances of the driver and configure them for failover to ensure continuous operation even if the primary driver fails.
+  - **Resource Managers**: Use resource managers like YARN, Mesos, or Kubernetes to handle resource allocation and recover failed executors automatically.
+
+
+### Checkpointing
+
+- The Structured Streaming guarantees end-to-end **exactly-once** delivery (in micro-batch mode) through the semantics applied to state management, data source and data sink.
+
+- In Structured Streaming the items stored in checkpoint files are mainly the metadata about the offsets processed in the current batch.
+
+- The checkpoint are stored in the location specified in `checkpointLocation` option.
+
+- The commit log is a **Write-Ahead Logs (WAL)** recording the id-s of completed batches. It's used to check if given batch was fully processed, i.e. if all offsets were read and if the output was committed to the sink.
+
+Example: 
+
+```scala
+aggDF \
+  .writeStream \ // Specify that we are writing the stream
+  .outputMode("complete") \ // Specify the output mode as "complete"
+  .option("checkpointLocation", "path/to/HDFS/dir") \ // Set the checkpoint location to a directory in HDFS
+  .format("memory") \ // Specify the format as "memory", which stores the output in memory for querying within Spark
+  .start()   // Start the streaming query
+```
+
+- `aggDF`: The aggregated DataFrame resulting from some upstream transformations.
+- `.writeStream`: Indicate that this DataFrame will be written to a streaming sink.
+- `.outputMode("complete")`: Specify the output mode as "complete". In this mode, the entire result table is output to the sink after each trigger. This is often used for aggregations where you want to see the full result of the aggregation each time.
+- `.option("checkpointLocation", "path/to/HDFS/dir")`: Set the checkpoint location to a directory in HDFS (or other reliable storage). This is necessary for maintaining the state of the streaming query and for recovery in case of failures.
+- `.format("memory")`: Specify the output format as "memory". This format stores the output in Spark's in-memory table, which is useful for debugging and low-latency access to the results.
+- `.start()`: Start the streaming query, which begins processing the data and writing the results to the specified sink.
+
+
+### Asynchronous Progress Tracking
+
+Asynchronous progress tracking is a feature that allows Spark Structured Streaming to checkpoint its progress asynchronously. This means that the tracking of the streaming query's progress (like offset logs and commit logs) happens in the background, without blocking the main data processing workflow.
+
+By performing checkpointing operations asynchronously, the latency associated with maintaining the offset log and commit log is reduced. This is particularly beneficial for high-throughput streaming applications where minimizing latency is critical.
+
+![](./img/04_25.png)
+
+Limitations:
+- Currently, asynchronous progress tracking **is supported only in the Kafka Sink**. This means you can use this feature when your streaming job writes data to a Kafka topic.
+- Asynchronous progress tracking **does not support exactly-once processing guarantees**. It supports at-least-once semantics, where each record is processed at least once, but duplicates might occur.
+
+Example code:
+
+```scala
+val stream = spark.readStream
+  .format("kafka")
+  .option("kafka.bootstrap.servers", "host1:port1,host2:port2")
+  .option("subscribe", "in") // Kafka topic to read from
+  .load()
+
+val query = stream.writeStream
+  .format("kafka")
+  .option("topic", "out") // Kafka topic to write to
+  .option("checkpointLocation", "/tmp/checkpoint") // Directory to store checkpoint data
+  .option("asyncProgressTrackingEnabled", "true") // Enable asynchronous progress tracking
+  .start()
+```
+
+
+
+### Checkpointing in Databricks
+
+See more information here: [Speed Up Streaming Queries With Asynchronous State Checkpointing](https://www.databricks.com/blog/2022/05/02/speed-up-streaming-queries-with-asynchronous-state-checkpointing.html).
+
+![](./img/04_26.png)
+
+
+
+**Enabling asynchronous state checkpointing:**
+
+Asynchronous Checkpointing is available in Databricks Runtime 10.3 and above. Use the following Spark configurations:
+
+```
+spark.conf.set(
+  "spark.databricks.streaming.statefulOperator.asyncCheckpoint.enabled",
+  "true"
+)
+
+spark.conf.set(
+  "spark.sql.streaming.stateStore.providerClass",
+  "com.databricks.sql.streaming.state.RocksDBStateStoreProvider"
+)
+```
+
+**Identifying candidate queries**
+
+Asynchronous state checkpointing only helps with certain workloads: stateful streams whose state checkpoint commit latency is a major contributing factor to overall micro-batch execution latency. Job has one or more stateful operations.
+
+Here’s how users can identify good candidates:
+
+- **Stateful operations**: the query includes stateful operations like windows, aggregations, [flat]mapGroupsWithState or stream-stream joins.
+- **State checkpoint commit latency**: users can inspect the metrics from within a `StreamingQueryListener` event to understand the impact of the commit latency on overall micro-batch execution time. The log4j logs on the driver also contain the same information.
+
+
+How to analyze a StreamingQueryListener event for good candidate query:
+
+```json
+Streaming query made progress: {
+  "id" : "2e3495a2-de2c-4a6a-9a8e-f6d4c4796f19",
+  "runId" : "e36e9d7e-d2b1-4a43-b0b3-e875e767e1fe",
+  …
+  "batchId" : 0,
+  "durationMs" : {
+    "addBatch" : 519387,
+  …
+    "triggerExecution" : 547730,
+  …
+  },
+  "stateOperators" : [ {
+  …
+    "commitTimeMs" : 3186626,
+  …
+    "numShufflePartitions" : 64,
+  …
+    }]
+  }
+```
+
+Focus on metrics:
+- Batch duration (`durationMs.triggerExecution`) 
+- The aggregate state store commit time across all tasks (`stateOperators[0].commitTimeMs`) 
+- Tasks related to the state store (`stateOperators[0].numShufflePartitions`)
+
+See more details [here](https://www.databricks.com/blog/2022/05/02/speed-up-streaming-queries-with-asynchronous-state-checkpointing.html).
+
+
+### Synchronous vs Asynchronous Checkpointing
+
+| Characteristic | Synchronous Checkpointing                              | Asynchronous Checkpointing                                      |
+|----------------|--------------------------------------------------------|-----------------------------------------------------------------|
+| **Latency**    | Higher latency for each micro-batch.                   | Reduced latency as micro-batches can overlap.                   |
+| **Restart**    | Fast recovery as only last batch needs to be re-run.   | Higher restart delay as more than one micro-batch might need to be re-run. |
+
+
+- **Failure handling in Asynchronous Checkpointing**: Any failure in the checkpointing process at any one or more stores can cause the entire query to fail. This means that while asynchronous checkpointing reduces latency, it can introduce complexity in failure recovery, requiring more robust error-handling mechanisms.
+
+- **Cluster Resizing in Asynchronous Checkpointing**: This approach may not work well with cluster resizing events. When nodes are added or removed, the state stores' instances might get redistributed. This redistribution can complicate the checkpointing process and state recovery, potentially leading to inconsistencies or additional delays.
+
+- **Support for State Store Providers in Asynchronous Checkpointing**: Currently, asynchronous state checkpointing is supported only in the RocksDB state store provider implementation. This means that other state store implementations do not support asynchronous checkpointing, limiting the flexibility of using different storage backends.
