@@ -846,7 +846,7 @@ In Spark, handling null values is crucial for ensuring accurate data processing 
 ```python
 df.na.drop() # removes all rows containing any null values across all columns
 
-df.dropna(subset['colA', 'colB']) # drops rows where either 'colA' or 'colB' is null
+df.dropna(subset=['colA', 'colB']) # drops rows where either 'colA' or 'colB' is null
 
 df.filter(df.colA.isNotNull()) # filters out rows where 'colA' is not null
 ```
