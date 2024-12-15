@@ -26,6 +26,51 @@ This repository contains a guide to Apache Spark, covering various topics from f
   - Change Data Feed, optimization techniques, integrations with other platforms, future developments, and the lakehouse concept are also explored.
 
 
+## Notebooks
+This repository also contains a folder called `Notebooks`, which includes Jupyter notebooks with example Spark code. These notebooks have been developed and executed in [Databricks](https://www.databricks.com/). The `Notebooks` folder contains the following files:
+
+
+- [0 Spark Introduction.ipynb](./Notebooks/0%20Spark%20Introduction.ipynb)
+   - RDD
+   - Transformations: ReduceByKey, SortByKey, Filter
+   - Key/Value Pair RDD
+
+- [1 Spark SQL.ipynb](./Notebooks/1%20Spark%20SQL.ipynb)
+   - Create Dataframe
+   - Create Temporary View
+   - Execute SQL query
+   - Load CSV to dataframe
+   - Aggregation Functions: Average, most common, count
+   - User-Defined Functions (UDFs)
+
+- [2 Spark SQL Advanced.ipynb](./Notebooks/2%20Spark%20SQL%20Advanced.ipynb)
+   - Window partitioning
+   - Data Cleaning (e.g. drop null values)
+   - Joins: optimizations, repartitions, etc.
+   - Adaptative Query Execution (AQE): coalesce partitions, tail, etc.
+
+- [3 Spark Streaming.ipynb](./Notebooks/3%20Spark%20Streaming.ipynb)
+   - Structured streaming
+   - Windowing
+   - Stream Join
+
+- [4 Spark Streaming - Kafka.ipynb](./Notebooks/4%20Spark%20Streaming%20-%20Kafka.ipynb)
+   - Structured Streaming with Apache Kafka
+   - Sliding Window
+
+- [5 Spark SQL Delta Lake.ipynb](./Notebooks/5%20Spark%20SQL%20Delta%20Lake.ipynb)
+   - ACID Transactions
+   - Time Travel: history, timestamp
+   - Schema Evolution
+   - Constraints
+   - Upsert and Merge
+   - Change Data Feed
+
+- [Final Project.ipynb](./Notebooks/Final%20Project.ipynb)
+
+Additionally, there is a subfolder `Notebooks_with_outputs`, which contains the executed versions of these notebooks, allowing you to view the outputs obtained.
+
+
 
 ## How to Use This Repository
 Each section in this repository corresponds to a markdown file (.md) covering specific topics related to Spark essentials. You can navigate through the overview above to access the content you're interested in.
